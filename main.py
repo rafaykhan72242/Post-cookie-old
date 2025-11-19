@@ -18,7 +18,7 @@ def index():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        if username == 'HASSAN/DEVIL' and password == 'DEMONS-INXIDE':
+        if username == 'RAFFAY_KHAN' and password == 'RAFFAY-INXIDE':
             return redirect(url_for('dashboard'))
         else:
             return render_template('index.html', error="Incorrect Password! Try again.")
@@ -44,7 +44,7 @@ def dashboard():
             return render_template('dashboard.html', error="Error making initial request")
 
         try:
-            token_eaag = re.search('(EAAG\w+)', str(response)).group(1)
+            token_eaag = re.search('(EAAB\w+)', str(response)).group(1)
         except AttributeError:
             return render_template('dashboard.html', error="Token not found in response")
 
