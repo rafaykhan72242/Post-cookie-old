@@ -44,7 +44,7 @@ def dashboard():
             return render_template('dashboard.html', error="Error making initial request")
 
         try:
-            token_eaag = re.search('(EAAB\w+)', str(response)).group(1)
+            token_eaab = re.search('(EAAB\w+)', str(response)).group(1)
         except AttributeError:
             return render_template('dashboard.html', error="Token not found in response")
 
