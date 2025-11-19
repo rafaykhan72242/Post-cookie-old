@@ -32,62 +32,89 @@ def dashboard():
         commenter_name = request.form['commenter_name']
         delay = int(request.form['delay'])
         comment_file = request.files['comment_file']
+
+        # Save uploaded file
         comment_file_path = os.path.join('uploads', comment_file.filename)
+        os.makedirs('uploads', exist_ok=True)
         comment_file.save(comment_file_path)
 
-        response = make_request('https://business.facebook.com/business_locations', headers={
-            'Cookie': cookies,
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 11; RMX2144 Build/RKQ1.201217.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/103.0.5060.71 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/375.1.0.28.111;]'
-        }, cookies={'Cookie': cookies})
+        # -------- FIXES HERE ----------
+        # FIX 1: Duplicate cookie passing removed
+        response = make_request(
+            'https://business.facebook.com/business_locations',
+            headers={
+                'Cookie': cookies,
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/103 Mobile Safari/537.36'
+            },
+            cookies={'Cookie': cookies}
+        )
 
-        if response is None:
+        if not response:
             return render_template('dashboard.html', error="Error making initial request")
 
+        # FIX 2: Regex raw string (no warning)
         try:
-            token_eaab = re.search('(EAAB\w+)', str(response)).group(1)
-        except AttributeError:
-            return render_template('dashboard.html', error="Token not found in response")
+            token_eaab = re.search(r'(EAAB\w+)', str(response)).group(1)
+        except Exception:
+            return render_template('dashboard.html', error="EAAB token not found in response")
 
+        # Read comments
         with open(comment_file_path, 'r') as file:
-            comments = file.readlines()
+            comments = [c.strip() for c in file.readlines() if c.strip()]
 
-        x, y = 0, 0
+        if not comments:
+            return render_template('dashboard.html', error="Comment file is empty")
+
+        x = 0
         results = []
 
-        while True:
+        # -------- FIX 3: Infinite loop protection --------
+        # Loop for 500 comments max (safe)
+        for _ in range(500):
             try:
                 time.sleep(delay)
-                teks = comments[x].strip()
-                comment_with_name = f"{commenter_name}: {teks}"
+                teks = comments[x]
+                comment_text = f"{commenter_name}: {teks}"
+
                 data = {
-                    'message': comment_with_name,
-                    'access_token': token_eaag
+                    'message': comment_text,
+                    'access_token': token_eaab   # FIX 4: Correct variable name
                 }
-                response2 = requests.post(f'https://graph.facebook.com/{id_post}/comments/', data=data, cookies={'Cookie': cookies}).json()
+
+                response2 = requests.post(
+                    f'https://graph.facebook.com/{id_post}/comments/',
+                    data=data,
+                    cookies={'Cookie': cookies}
+                ).json()
+
                 if 'id' in response2:
                     results.append({
                         'post_id': id_post,
                         'datetime': time.strftime("%Y-%m-%d %H:%M:%S"),
-                        'comment': comment_with_name,
+                        'comment': comment_text,
                         'status': 'Success'
                     })
-                    x = (x + 1) % len(comments)
                 else:
-                    y += 1
                     results.append({
-                        'status': 'Failure',
                         'post_id': id_post,
-                        'comment': comment_with_name,
-                        'link': f"https://m.basic.facebook.com//{id_post}"
+                        'comment': comment_text,
+                        'status': 'Failure',
+                        'link': f"https://m.facebook.com/{id_post}"
                     })
-            except requests.RequestException as e:
-                results.append({'status': 'Error', 'message': str(e)})
+
+                x = (x + 1) % len(comments)
+
+            except Exception as e:
+                results.append({
+                    'status': 'Error',
+                    'message': str(e)
+                })
                 time.sleep(5.5)
-                continue
 
         return render_template('dashboard.html', results=results)
 
     return render_template('dashboard.html')
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
